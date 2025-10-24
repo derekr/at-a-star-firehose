@@ -1,0 +1,20 @@
+{
+  "name": "at-a-star-firehose",
+  "module": "index.tsx",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@atproto/api": "^0.17.3",
+    "@atproto/sync": "^0.1.35",
+    "@atproto/xrpc-server": "^0.9.5",
+    "cbor-x": "^1.6.0",
+    "hono": "^4.10.2",
+    "zod": "^4.1.12"
+  }
+}
