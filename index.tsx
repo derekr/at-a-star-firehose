@@ -302,10 +302,10 @@ function DebugInfo({
   totalCount: number;
 }) {
   const allSessions = Array.from(sessions.values()).sort((a, b) =>
-    a.id.localeCompare(b.id)
+    a.id.localeCompare(b.id),
   );
   const allTabs = Array.from(tabs.values()).sort((a, b) =>
-    a.id.localeCompare(b.id)
+    a.id.localeCompare(b.id),
   );
 
   return (
@@ -464,7 +464,7 @@ function ContainerContent({ session, tab }: { session: Session; tab: Tab }) {
   const totalCount = getTotalCount();
 
   return (
-    <div id="content" class="container-content">
+    <div class="container-content">
       <h1>🔥 AT Proto Firehose</h1>
       <FilterInput value={tab.filter} />
 
@@ -486,7 +486,7 @@ function ContainerContent({ session, tab }: { session: Session; tab: Tab }) {
 
 function Container({ session, tab }: { session: Session; tab: Tab }) {
   return (
-    <div id="container" class="container">
+    <div class="container">
       <ContainerContent session={session} tab={tab} />
     </div>
   );
@@ -501,7 +501,6 @@ function Body({ session, tab }: { session: Session; tab: Tab }) {
           "$tabId = sessionStorage.getItem('tabId') || $tabId; document.cookie = 'sessionId=' + $sessionId + '; path=/; max-age=31536000'; sessionStorage.setItem('tabId', $tabId); @get('/')",
       }}
     >
-      <datastar-inspector></datastar-inspector>
       <Container session={session} tab={tab} />
     </body>
   );
@@ -535,7 +534,8 @@ app.get("/", async (c) => {
       try {
         const signals = JSON.parse(datastarParam);
         sessionId = signals.sessionId;
-        tabId = signals.tabId && signals.tabId !== "" ? signals.tabId : undefined;
+        tabId =
+          signals.tabId && signals.tabId !== "" ? signals.tabId : undefined;
       } catch {}
     }
   } else {
@@ -549,7 +549,7 @@ app.get("/", async (c) => {
   }
 
   const session = getOrCreateSession(sessionId);
-  
+
   if (isDatastarRequest) {
     const tab = getOrCreateTab(tabId, session.id);
     return streamSSE(c, async (stream) => {
@@ -558,31 +558,13 @@ app.get("/", async (c) => {
       stream.onAbort(() => ac.abort());
 
       const sendUpdate = async () => {
-        const filter = tab.filter.length >= MIN_FILTER_LENGTH ? tab.filter : "";
-        const posts = queryPosts(filter);
-        const totalCount = getTotalCount();
-
-        const postsHtml = (<Posts posts={posts} filter={filter} />)
-          .toString()
-          .replaceAll("\n", "");
-        const statsHtml = (
-          <Stats
-            filter={filter}
-            postsCount={posts.length}
-            totalCount={totalCount}
-          />
-        )
-          .toString()
-          .replaceAll("\n", "");
-        const debugHtml = (
-          <DebugInfo session={session} tab={tab} totalCount={totalCount} />
-        )
+        const bodyHtml = (<Body session={session} tab={tab} />)
           .toString()
           .replaceAll("\n", "");
 
         await stream.writeSSE({
           event: "datastar-patch-elements",
-          data: `elements ${postsHtml} ${statsHtml} ${debugHtml}`,
+          data: `elements ${bodyHtml}`,
         });
       };
 
@@ -598,6 +580,8 @@ app.get("/", async (c) => {
 
         events.on("posts.added", postsListener);
         events.on("filter.updated", filterListener);
+
+        await sendUpdate();
 
         ac.signal.addEventListener("abort", () => {
           events.off("posts.added", postsListener);
