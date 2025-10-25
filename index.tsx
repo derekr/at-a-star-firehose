@@ -301,8 +301,12 @@ function DebugInfo({
   tab: Tab;
   totalCount: number;
 }) {
-  const allSessions = Array.from(sessions.values());
-  const allTabs = Array.from(tabs.values());
+  const allSessions = Array.from(sessions.values()).sort((a, b) =>
+    a.id.localeCompare(b.id)
+  );
+  const allTabs = Array.from(tabs.values()).sort((a, b) =>
+    a.id.localeCompare(b.id)
+  );
 
   return (
     <div id="debug" class="debug-section">
@@ -320,20 +324,12 @@ function DebugInfo({
         <span>{session.id}</span>
       </div>
       <div class="session-info">
-        <strong>Tab ID (client): </strong>
+        <strong>Tab ID: </strong>
         <span {...{ "data-text": "$tabId" }}></span>
       </div>
       <div class="session-info">
-        <strong>Tab ID (server): </strong>
-        <span>{tab.id}</span>
-      </div>
-      <div class="session-info">
-        <strong>Client filter value: </strong>
+        <strong>Filter: </strong>
         <span {...{ "data-text": "$filter" }}></span>
-      </div>
-      <div class="session-info">
-        <strong>Server filter value: </strong>
-        <span>{tab.filter}</span>
       </div>
       <div class="feed-stats">
         <pre>
@@ -502,7 +498,7 @@ function Body({ session, tab }: { session: Session; tab: Tab }) {
       {...{
         "data-signals": `{filter: '', sessionId: '${session.id}', tabId: '${tab.id}'}`,
         "data-init":
-          "document.cookie = 'sessionId=' + $sessionId + '; path=/; max-age=31536000'; @get('/')",
+          "$tabId = sessionStorage.getItem('tabId') || $tabId; document.cookie = 'sessionId=' + $sessionId + '; path=/; max-age=31536000'; sessionStorage.setItem('tabId', $tabId); @get('/')",
       }}
     >
       <datastar-inspector></datastar-inspector>
@@ -539,7 +535,7 @@ app.get("/", async (c) => {
       try {
         const signals = JSON.parse(datastarParam);
         sessionId = signals.sessionId;
-        tabId = signals.tabId;
+        tabId = signals.tabId && signals.tabId !== "" ? signals.tabId : undefined;
       } catch {}
     }
   } else {
@@ -553,9 +549,9 @@ app.get("/", async (c) => {
   }
 
   const session = getOrCreateSession(sessionId);
-  const tab = getOrCreateTab(tabId, session.id);
-
+  
   if (isDatastarRequest) {
+    const tab = getOrCreateTab(tabId, session.id);
     return streamSSE(c, async (stream) => {
       const ac = new AbortController();
 
@@ -606,6 +602,7 @@ app.get("/", async (c) => {
         ac.signal.addEventListener("abort", () => {
           events.off("posts.added", postsListener);
           events.off("filter.updated", filterListener);
+          tabs.delete(tab.id);
         });
 
         for await (const _ of on(updateQueue as any, "update", {
@@ -621,6 +618,7 @@ app.get("/", async (c) => {
     });
   }
 
+  const tab = { id: crypto.randomUUID(), sessionId: session.id, filter: "" };
   return c.html(Page({ session, tab }));
 });
 
